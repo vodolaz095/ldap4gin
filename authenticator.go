@@ -2,8 +2,10 @@ package ldap4gin
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -16,7 +18,7 @@ const SessionKeyName = "ldap4gin_user"
 // Authorize tries to find user in ldap database, check his/her password via `bind` and populate session, if password matches
 func (a *Authenticator) Authorize(c *gin.Context, username, password string) (err error) {
 	session := sessions.Default(c)
-	dn := fmt.Sprintf(a.UserBaseTpl, username)
+	dn := fmt.Sprintf(a.userBaseTpl, username)
 	err = a.LDAPConn.Bind(dn, password)
 	if err != nil {
 		if strings.HasPrefix("LDAP Result Code 49 \"Invalid Credentials\"", err.Error()) {
@@ -25,14 +27,24 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 		}
 		return
 	}
-
 	// Search info about given username
+	var timeout int
+	deadline, ok := c.Request.Context().Deadline()
+	if ok {
+		timeout = int(math.Round(deadline.Sub(time.Now()).Seconds()))
+	} else {
+		timeout = 0
+	}
 	searchRequest := ldap.NewSearchRequest(
-		dn,
-		ldap.ScopeBaseObject, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(uid=%s)", username),
-		Fields,
-		nil,
+		dn,                                // base DN
+		ldap.ScopeBaseObject,              // scope
+		ldap.NeverDerefAliases,            // DerefAliases
+		0,                                 // size limit
+		timeout,                           // timeout
+		false,                             // types only
+		fmt.Sprintf("(uid=%s)", username), // filter
+		a.fields,                          // fields
+		nil,                               // controls
 	)
 	res, err := a.LDAPConn.Search(searchRequest)
 	if err != nil {
@@ -42,7 +54,7 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 		fmt.Println("ldap4gin: user profile found")
 		res.PrettyPrint(2)
 	}
-	if len(res.Entries) != 0 {
+	if len(res.Entries) == 0 {
 		err = fmt.Errorf("user not found")
 		return
 	}
@@ -52,23 +64,29 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 	}
 	entry := res.Entries[0]
 	user := User{
-		DN:            entry.DN,
-		UID:           entry.GetAttributeValue("uid"),
-		GivenName:     entry.GetAttributeValue("givenname"),
-		CommonName:    entry.GetAttributeValue("cn"),
-		Initials:      entry.GetAttributeValue("initials"),
-		Surname:       entry.GetAttributeValue("sn"),
-		Description:   entry.GetAttributeValue("description"),
-		Title:         entry.GetAttributeValue("title"),
-		HomeDirectory: entry.GetAttributeValue("homedirectory"),
-		LoginShell:    entry.GetAttributeValue("loginshell"),
+		DN:         entry.DN,
+		UID:        entry.GetAttributeValue("uid"),
+		GivenName:  entry.GetAttributeValue("givenName"),
+		CommonName: entry.GetAttributeValue("cn"),
+		Initials:   entry.GetAttributeValue("initials"),
+		Surname:    entry.GetAttributeValue("sn"),
+
+		Organization:     entry.GetAttributeValue("o"),
+		OrganizationUnit: entry.GetAttributeValue("ou"),
+		Description:      entry.GetAttributeValue("description"),
+		Title:            entry.GetAttributeValue("title"),
+
+		Website: entry.GetAttributeValue("labeledURI"),
+
+		HomeDirectory: entry.GetAttributeValue("homeDirectory"),
+		LoginShell:    entry.GetAttributeValue("loginShell"),
+		Entry:         entry,
 	}
 	uid := entry.GetAttributeValue("uidNumber")
 	if uid != "" {
 		uidAsInt, err := strconv.ParseUint(uid, 10, 32)
 		if err != nil {
-			err = fmt.Errorf("%s : while parsing uidNumber %s of user %s", err, uid, user.DN)
-			return
+			return fmt.Errorf("%s : while parsing uidNumber %s of user %s", err, uid, user.DN)
 		}
 		user.UIDNumber = uidAsInt
 	}
@@ -77,8 +95,7 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 	if gid != "" {
 		gidAsInt, err := strconv.ParseUint(uid, 10, 32)
 		if err != nil {
-			err = fmt.Errorf("%s : while parsing gidNumber %s of user %s", err, gid, user.DN)
-			return
+			return fmt.Errorf("%s : while parsing gidNumber %s of user %s", err, gid, user.DN)
 		}
 		user.GIDNumber = gidAsInt
 	}
@@ -97,13 +114,14 @@ func (a *Authenticator) Extract(c *gin.Context) (user User, err error) {
 	ui := session.Get(SessionKeyName)
 	if ui != nil {
 		user = ui.(User)
+		fmt.Println(user)
 	} else {
 		err = fmt.Errorf("unauthorized")
 	}
 	return
 }
 
-// Logout logouts user from session
+// Logout terminates user's session
 func (a *Authenticator) Logout(c *gin.Context) (err error) {
 	session := sessions.Default(c)
 	session.Delete(SessionKeyName)

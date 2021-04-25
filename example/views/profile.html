@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Profile of user {{.user.CommonName}} aka {{.user.UID}}</title>
+</head>
+<style>
+    .wrapper {
+        display: grid;
+        grid-template-columns: 40% 60%;
+        grid-gap: 5%;
+    }
+    .row {
+        padding: 5%;
+    }
+</style>
+<body>
+<h1>Profile of user {{.user.CommonName}} aka {{.user.UID}}</h1>
+{{ range .flashes }}
+<h3>{{ . }}</h3>
+{{ end }}
+<p><a href="/logout">Logout</a></p>
+<div class="wrapper">
+  <div class="row">
+    <table border="1" cellpadding="3" cellspacing="0">
+      <tr>
+        <th>Parameter</th>
+        <th>Value</th>
+      </tr>
+      <tr>
+        <th colspan="2">General</th>
+      </tr>
+      <tr>
+        <td>DN</td>
+        <td>{{.user.DN}}</td>
+      </tr>
+      <tr>
+        <td>UID</td>
+        <td>{{.user.UID}}</td>
+      </tr>
+      <tr>
+        <th colspan="2">Name</th>
+      </tr>
+      <tr>
+        <td>GivenName</td>
+        <td>{{.user.GivenName}}</td>
+      </tr>
+      <tr>
+        <td>CommonName</td>
+        <td>{{.user.CommonName}}</td>
+      </tr>
+      <tr>
+        <td>Initials</td>
+        <td>{{.user.Initials}}</td>
+      </tr>
+      <tr>
+        <td>Surname</td>
+        <td>{{.user.Surname}}</td>
+      </tr>
+
+      <tr>
+        <th colspan="2">Organizational</th>
+      </tr>
+      <tr>
+        <td>Organization</td>
+        <td>{{.user.Organization}}</td>
+      </tr>
+      <tr>
+        <td>OrganizationUnit</td>
+        <td>{{.user.OrganizationUnit}}</td>
+      </tr>
+      <tr>
+        <td>Title</td>
+        <td>{{.user.Title}}</td>
+      </tr>
+      <tr>
+        <td>Description</td>
+        <td>{{.user.Description}}</td>
+      </tr>
+
+      <tr>
+        <th colspan="2">Internet related</th>
+      </tr>
+      <tr>
+        <td>Website</td>
+        <td><a href="{{.user.Website}}">{{.user.Website}}</a></td>
+      </tr>
+      <tr>
+        <td>Emails</td>
+        <td>
+          <ul>
+            {{ range $index, $element := .user.Emails }}
+            <li><a href="mailto:{{$element}}">{{$element}}</a></li>
+            {{ end }}
+          </ul>
+        </td>
+      </tr>
+      <tr>
+        <th colspan="2">Linux specific</th>
+      </tr>
+      <tr>
+        <td>UIDNumber</td>
+        <td>{{.user.UIDNumber}}</td>
+      <tr>
+        <td>GIDNumber</td>
+        <td>{{.user.GIDNumber}}</td>
+      <tr>
+        <td>HomeDirectory</td>
+        <td>{{.user.HomeDirectory}}</td>
+      <tr>
+        <td>LoginShell</td>
+        <td>{{.user.LoginShell}}</td>
+      </tr>
+      <tr>
+        <th colspan="2">Extras</th>
+      </tr>
+      <tr>
+        <td>Location</td>
+        <td>{{.user.Entry.GetAttributeValue "l"}}</td>
+      </tr>
+    </table>
+  </div>
+  <div class="row">
+    <p>Raw representation:</p>
+    <pre>{{.raw}}</pre>
+  </div>
+</div>
+</body>
+</html>

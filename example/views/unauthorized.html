@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Authorization required</title>
+</head>
+<body>
+<h1>Authorization required</h1>
+{{ range .flashes }}
+<h3>{{ . }}</h3>
+{{ end }}
+<form action="/login" method="post">
+  <label for="username">Username:</label>
+  <input id="username" name="username" value="" type="password" placeholder="Svetlana">
+  <label for="password">Password:</label>
+  <input id="password" name="password" value="" type="password" placeholder="secret">
+  <input type="submit" value="Login">
+</form>
+</body>
+</html>
