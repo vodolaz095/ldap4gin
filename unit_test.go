@@ -81,7 +81,7 @@ func TestCreateApp(t *testing.T) {
 	r.GET("/", func(c *gin.Context) {
 		user, err := authenticator.Extract(c)
 		if err != nil {
-			if err.Error() == "unauthorized" { // render login page
+			if err.Error() == "unauthorized" {
 				c.AbortWithStatus(http.StatusUnauthorized)
 				return
 			}
@@ -95,9 +95,13 @@ func TestCreateApp(t *testing.T) {
 		fmt.Printf("Authorizing as %s %s...\n", username, password)
 		err := authenticator.Authorize(c, username, password)
 		if err != nil {
-			fmt.Println("Error", err)
+			fmt.Printf("Error >%s<\n", err.Error())
 			if err.Error() == "invalid credentials" {
 				c.AbortWithStatus(http.StatusBadRequest)
+				return
+			}
+			if err.Error() == "malformed username" {
+				c.AbortWithStatus(http.StatusTeapot)
 				return
 			}
 			c.AbortWithStatus(http.StatusInternalServerError)
@@ -140,6 +144,24 @@ func TestAuthenticator_Authorize_fail(t *testing.T) {
 	app.ServeHTTP(w, req)
 	resp := w.Result()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "wrong status code")
+}
+
+func TestAuthenticator_Authorize_malformed(t *testing.T) {
+	data := url.Values{}
+	data.Add("username", "thisIsMalformedUsername)}")
+	data.Add("password", "someRandomPasswordNobodyUses")
+	t.Logf("Body encoded - %s", data.Encode())
+	req := httptest.NewRequest(
+		"POST",
+		"http://russian.rt.com/login",
+		strings.NewReader(data.Encode()),
+	) // GIN engine should ignore HOSTNAME in header, so its ok if i provide it here
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+	w := httptest.NewRecorder()
+	app.ServeHTTP(w, req)
+	resp := w.Result()
+	assert.Equal(t, http.StatusTeapot, resp.StatusCode, "wrong status code")
 }
 
 var testSessionCookie *http.Cookie

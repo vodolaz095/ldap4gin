@@ -44,6 +44,15 @@ func main() {
 		user, err := authenticator.Extract(c)
 		if err != nil {
 			if err.Error() == "unauthorized" { // render login page
+				session.AddFlash("Authorization failed")
+				session.Save()
+				c.HTML(http.StatusUnauthorized, "unauthorized.html", gin.H{
+					"flashes": flashes,
+				})
+				return
+			}
+			if err.Error() == "malformed username" {
+				session.AddFlash("Malformed username")
 				session.Save()
 				c.HTML(http.StatusUnauthorized, "unauthorized.html", gin.H{
 					"flashes": flashes,

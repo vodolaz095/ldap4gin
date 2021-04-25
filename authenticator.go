@@ -17,6 +17,9 @@ const SessionKeyName = "ldap4gin_user"
 
 // Authorize tries to find user in ldap database, check his/her password via `bind` and populate session, if password matches
 func (a *Authenticator) Authorize(c *gin.Context, username, password string) (err error) {
+	if !usernameRegexp.MatchString(username) {
+		return fmt.Errorf("malformed username")
+	}
 	session := sessions.Default(c)
 	dn := fmt.Sprintf(a.userBaseTpl, username)
 	err = a.LDAPConn.Bind(dn, password)
