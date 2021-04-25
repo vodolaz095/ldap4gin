@@ -6,7 +6,6 @@ require (
 	github.com/gin-contrib/sessions v0.0.3
 	github.com/gin-gonic/gin v1.7.1
 	github.com/go-asn1-ber/asn1-ber v1.5.3 // indirect
-	github.com/go-ldap/ldap v2.5.1+incompatible // indirect
 	github.com/go-ldap/ldap/v3 v3.3.0
 	github.com/go-playground/validator/v10 v10.5.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
