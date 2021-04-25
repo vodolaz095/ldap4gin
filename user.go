@@ -5,8 +5,9 @@ import (
 	"github.com/go-ldap/ldap/v3"
 )
 
-// User depicts authorized user
+// User depicts profile of authorized user
 type User struct {
+	// General
 	DN  string // dn: uid=sveta,ou=people,dc=vodolaz095,dc=life
 	UID string //uid: sveta
 

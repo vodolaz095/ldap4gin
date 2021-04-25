@@ -4,6 +4,18 @@ Authenticator for gin framework using ldap server
 [![Go Report Card](https://goreportcard.com/badge/github.com/vodolaz095/ldap4gin)](https://goreportcard.com/report/github.com/vodolaz095/ldap4gin)
 [![GoDoc](https://godoc.org/github.com/vodolaz095/ldap4gin?status.svg)](https://godoc.org/github.com/vodolaz095/ldap4gin)
 
+# Installing
+
+Usual way for go module
+
+```shell
+
+go get -u github.com/vodolaz095/ldap4gin
+
+```
+
+Code was tested against popular [osixia/openldap:1.4.0](https://hub.docker.com/r/osixia/openldap) container,
+with records generated using [ldapaccountmanager/lam](https://hub.docker.com/r/ldapaccountmanager/lam) web ui.
 
 # Example
 Working example is published in `example/` subdirectory of this repo
@@ -76,7 +88,7 @@ func main() {
 		username := c.PostForm("username")
 		password := c.PostForm("password")
 		log.Printf("User %s tries to authorize from %s...", username, c.ClientIP())
-		err = authenticator.Authorize(c, username, password)
+		err := authenticator.Authorize(c, username, password)
 		if err != nil {
 			log.Printf("User %s failed to authorize from %s because of %s", username, c.ClientIP(), err.Error())
 			session.AddFlash(fmt.Sprintf("Authorization error  %s", err))

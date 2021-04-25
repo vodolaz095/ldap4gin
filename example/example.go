@@ -72,7 +72,7 @@ func main() {
 		username := c.PostForm("username")
 		password := c.PostForm("password")
 		log.Printf("User %s tries to authorize from %s...", username, c.ClientIP())
-		err = authenticator.Authorize(c, username, password)
+		err := authenticator.Authorize(c, username, password)
 		if err != nil {
 			log.Printf("User %s failed to authorize from %s because of %s", username, c.ClientIP(), err.Error())
 			session.AddFlash(fmt.Sprintf("Authorization error  %s", err))

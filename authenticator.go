@@ -21,7 +21,7 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 	dn := fmt.Sprintf(a.userBaseTpl, username)
 	err = a.LDAPConn.Bind(dn, password)
 	if err != nil {
-		if strings.HasPrefix("LDAP Result Code 49 \"Invalid Credentials\"", err.Error()) {
+		if strings.Contains(err.Error(), "LDAP Result Code 49") {
 			err = fmt.Errorf("invalid credentials")
 			return
 		}
