@@ -46,7 +46,7 @@ func TestNewFail(t *testing.T) {
 		}
 		t.Error(err)
 	}
-	t.Errorf("we connected to non existant ldap?")
+	t.Errorf("we connected to non existent ldap?")
 }
 
 func TestNewSuccess(t *testing.T) {

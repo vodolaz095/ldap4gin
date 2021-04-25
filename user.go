@@ -37,7 +37,7 @@ type User struct {
 	Entry *ldap.Entry
 }
 
-// GetDefaultFields returns fields we extract from LDAP by defauls
+// GetDefaultFields returns fields we extract from LDAP by default
 func GetDefaultFields() []string {
 	return []string{
 		"dn",
