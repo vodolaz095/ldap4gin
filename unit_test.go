@@ -28,8 +28,8 @@ var testPassword string
 
 func TestEnvironment(t *testing.T) {
 	testUsername = os.Getenv("TEST_LDAP_USERNAME")
-	testPassword = os.Getenv("TEST_LDAP_PASSWORD")
 	assert.NotEmpty(t, testUsername, "test username is not set")
+	testPassword = os.Getenv("TEST_LDAP_PASSWORD")
 	assert.NotEmpty(t, testPassword, "test password is not set")
 }
 

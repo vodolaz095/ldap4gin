@@ -1,6 +1,6 @@
 module github.com/vodolaz095/ldap4gin
 
-go 1.14
+go 1.16
 
 require (
 	github.com/gin-contrib/sessions v0.0.3
