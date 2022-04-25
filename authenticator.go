@@ -117,7 +117,9 @@ func (a *Authenticator) Extract(c *gin.Context) (user User, err error) {
 	ui := session.Get(SessionKeyName)
 	if ui != nil {
 		user = ui.(User)
-		fmt.Println(user)
+		if a.debug {
+			fmt.Printf("ldap4gin: user %s extraceted from session of %v using %s", user.UID, c.ClientIP(), c.GetHeader("User-Agent"))
+		}
 	} else {
 		err = fmt.Errorf("unauthorized")
 	}
