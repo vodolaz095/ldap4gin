@@ -208,22 +208,23 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 	if a.Options.TTL > 0 {
 		user.ExpiresAt = time.Now().Add(a.Options.TTL)
 	}
-	session.Set(SessionKeyName, &user)
+	session.Set(SessionKeyName, user)
 	err = session.Save()
 	return
 }
 
 // Extract extracts users profile from session
-func (a *Authenticator) Extract(c *gin.Context) (user User, err error) {
+func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 	session := sessions.Default(c)
 	ui := session.Get(SessionKeyName)
 	if ui != nil {
-		user = ui.(User)
+		raw := ui.(User)
+		user = &raw
 		if a.Options.Debug {
 			fmt.Printf("ldap4gin: user %s is extracted from session of %v using %s\n",
 				user.UID, c.ClientIP(), c.GetHeader("User-Agent"))
 		}
-		err = a.reload(c.Request.Context(), &user)
+		err = a.reload(c.Request.Context(), user)
 	} else {
 		err = ErrUnauthorized
 	}
