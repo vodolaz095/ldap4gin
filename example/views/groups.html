@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Groups of user {{.user.CommonName}} aka {{.user.UID}}</title>
+</head>
+<style>
+    .wrapper {
+        display: grid;
+        grid-template-columns: 30% 35%;
+        grid-gap: 5%;
+    }
+
+    .row {
+        padding: 5%;
+    }
+</style>
+<body>
+<h1>Groups of user {{.user.CommonName}} aka {{.user.UID}}</h1>
+{{ range .flashes }}
+<h3>{{ . }}</h3>
+{{ end }}
+<p>
+  <a href="/">Profile</a>
+  <a href="/groups">Groups</a>
+  <a href="/logout">Logout</a>
+</p>
+<div class="wrapper">
+  <div class="row">
+    <p>Groups of {{.user.CommonName}}:</p>
+    <ul>
+      {{ range .user.Groups }}
+      <li><b>{{ .GID}} {{.Name}}</b> - {{.Description}}</li>
+      {{ end }}
+    </ul>
+  </div>
+</div>
+</body>
+</html>

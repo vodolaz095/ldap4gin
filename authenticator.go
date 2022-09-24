@@ -27,7 +27,8 @@ func timeOut(ctx context.Context) (timeout int) {
 
 // Authenticator links ldap and gin context together
 type Authenticator struct {
-	fields  []string
+	fields []string
+	// Options are runtime options as received from New
 	Options *Options
 	// LDAPConn is ldap connection being used
 	LDAPConn *ldap.Conn
@@ -35,14 +36,14 @@ type Authenticator struct {
 
 func (a *Authenticator) bindAsUser(ctx context.Context, username, password string) (user *User, err error) {
 	if !usernameRegexp.MatchString(username) {
-		err = fmt.Errorf("malformed username")
+		err = ErrMalformed
 		return
 	}
 	dn := fmt.Sprintf(a.Options.UserBaseTpl, username)
 	err = a.LDAPConn.Bind(dn, password)
 	if err != nil {
 		if strings.Contains(err.Error(), "LDAP Result Code 49") {
-			err = fmt.Errorf("invalid credentials")
+			err = ErrInvalidCredentials
 			return
 		}
 		return
@@ -69,21 +70,14 @@ func (a *Authenticator) bindAsUser(ctx context.Context, username, password strin
 		res.PrettyPrint(2)
 	}
 	if len(res.Entries) == 0 {
-		err = fmt.Errorf("user not found")
+		err = ErrNotFound
 		return
 	}
 	if len(res.Entries) > 1 {
-		err = fmt.Errorf("multiple user profiles found")
+		err = ErrMultipleAccount
 		return
 	}
 	user, err = loadUserFromEntry(res.Entries[0])
-	if err != nil {
-		return
-	}
-	err = a.LDAPConn.Unbind()
-	if err != nil {
-		return
-	}
 	return
 }
 
@@ -102,6 +96,10 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 	}
 	err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
 	if err != nil {
+		if strings.Contains(err.Error(), "LDAP Result Code 49") {
+			err = ErrReadonlyWrongCredentials
+			return
+		}
 		return
 	}
 	searchGroupsRequest := ldap.NewSearchRequest(
@@ -131,16 +129,19 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 		}
 	}
 	user.Groups = groups
-	err = a.LDAPConn.Unbind()
 	return
 }
 
 func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	if !user.Expired() {
+		if a.Options.Debug {
+			fmt.Printf("ldap4gin: user %s will expire in %s\n",
+				user.UID, user.ExpiresAt.Sub(time.Now()).String())
+		}
 		return nil
 	}
 	if a.Options.Debug {
-		fmt.Printf("ldap4gin: user %s expired", user.UID)
+		fmt.Printf("ldap4gin: user %s expired\n", user.UID)
 	}
 	if a.Options.ReadonlyDN == "" {
 		err = fmt.Errorf("readonly distinguished name is not configured")
@@ -174,22 +175,20 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 		res.PrettyPrint(2)
 	}
 	if len(res.Entries) == 0 {
-		err = fmt.Errorf("user not found")
+		err = ErrNotFound
 		return
 	}
 	if len(res.Entries) > 1 {
-		err = fmt.Errorf("multiple user profiles found")
+		err = ErrMultipleAccount
 		return
 	}
 	user, err = loadUserFromEntry(res.Entries[0])
 	if err != nil {
 		return
 	}
-	err = a.LDAPConn.Unbind()
-	if err != nil {
-		return
+	if a.Options.ExtractGroups {
+		err = a.attachGroups(ctx, user)
 	}
-	err = a.attachGroups(ctx, user)
 	return
 }
 
@@ -206,6 +205,9 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 			return
 		}
 	}
+	if a.Options.TTL > 0 {
+		user.ExpiresAt = time.Now().Add(a.Options.TTL)
+	}
 	session.Set(SessionKeyName, &user)
 	err = session.Save()
 	return
@@ -218,12 +220,12 @@ func (a *Authenticator) Extract(c *gin.Context) (user User, err error) {
 	if ui != nil {
 		user = ui.(User)
 		if a.Options.Debug {
-			fmt.Printf("ldap4gin: user %s extraceted from session of %v using %s",
+			fmt.Printf("ldap4gin: user %s is extracted from session of %v using %s\n",
 				user.UID, c.ClientIP(), c.GetHeader("User-Agent"))
 		}
 		err = a.reload(c.Request.Context(), &user)
 	} else {
-		err = fmt.Errorf("unauthorized")
+		err = ErrUnauthorized
 	}
 	return
 }
@@ -233,5 +235,11 @@ func (a *Authenticator) Logout(c *gin.Context) (err error) {
 	session := sessions.Default(c)
 	session.Delete(SessionKeyName)
 	err = session.Save()
+	return
+}
+
+// Close closes authenticator connection to ldap
+func (a *Authenticator) Close() (err error) {
+	err = a.LDAPConn.Unbind()
 	return
 }

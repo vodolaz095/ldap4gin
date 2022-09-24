@@ -1,5 +1,6 @@
 package ldap4gin
 
+// Group is member of groups organization unit in ldap
 type Group struct {
 	GID         string // gidNumber
 	Name        string // cn

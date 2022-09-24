@@ -6,7 +6,8 @@ Authenticator for gin framework using ldap server
 
 
 # Advertisement
-You can hire the author of this package by Upwork - [https://www.upwork.com/freelancers/~0120ba573d09c66c51](https://www.upwork.com/freelancers/~0120ba573d09c66c51/)
+You can support development of this module by sending me money directly
+https://www.tinkoff.ru/rm/ostroumov.anatoliy2/4HFzm76801/
 
 # Installing
 
@@ -45,18 +46,31 @@ func main() {
    r := gin.Default()
    r.LoadHTMLGlob("views/*")
    // configuring options used to connect to LDAP database
-   authenticator, err := ldap4gin.New(ldap4gin.Options{
-      Debug:            gin.IsDebugging(),
+   authenticator, err := ldap4gin.New(&ldap4gin.Options{
+      Debug: gin.IsDebugging(),
+
       ConnectionString: "ldap://127.0.0.1:389",
-      UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=life",
+      ReadonlyDN:       "cn=readonly,dc=vodolaz095,dc=life", // only required, if we enable ExtractGroups:true
+      ReadonlyPasswd:   "readonly",  // only required, if we enable ExtractGroups:true
       TLS:              &tls.Config{}, // nearly sane default values
       StartTLS:         false,
-      ExtraFields:      []string{"l"}, // get location too
+
+      UserBaseTpl: "uid=%s,ou=people,dc=vodolaz095,dc=life",
+      ExtraFields: []string{"l"}, // get location too
+
+      ExtractGroups: true, 
+      GroupsOU:      "ou=groups,dc=vodolaz095,dc=life",  // only required, if we enable ExtractGroups:true
+
+      // how long to store user's profile in session, 
+      // if profile is expired, it is reloaded from ldap database
+	  // if we set TTL to 0, profile will never expire
+      TTL: 10 * time.Second, 
    })
    if err != nil {
       log.Fatalf("%s : while initializing ldap4gin authenticator", err)
    }
    log.Println("LDAP server dialed!")
+   defer authenticator.Close()
 
    // Application should use any of compatible sessions offered by
    // https://github.com/gin-contrib/sessions module
@@ -138,9 +152,9 @@ func main() {
 How it works?
 ============================
 
-You can read [very good article in Russian language describing authentication process via LDAP](https://vodolaz095.life/nodejs-openldap/).
+You can read [very good article in Russian language describing authentication process via LDAP](https://vodolaz095.ru/nodejs-openldap/).
 
-Shortly, these steps are performed in `authorize.go` module:
+Shortly, these steps are performed in this module module:
 
 1. we build DN using `username` parameter provided and `UserBaseTpl` of options
 
@@ -193,6 +207,9 @@ searchRequest := ldap.NewSearchRequest(
 
 4. After we extract data, we marshal it in User object, and store it in session using `gob` encoding. Its is worth notice
    that sometimes profile size is too big for session storage, and it can be wise not to store all users fields in session
+
+5. If we enable extraction of groups by setting  `ExtractGroups:true`, we will also perform bind by specual user
+   with readonly access to all database in order to load groups of user we want to authenticate
 
 # MIT License
 

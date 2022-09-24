@@ -58,6 +58,10 @@ func TestNewSuccess(t *testing.T) {
 		TLS: &tls.Config{
 			InsecureSkipVerify: true, // NEVER DO IT
 		},
+		ExtractGroups:  true,
+		ReadonlyDN:     "cn=readonly,dc=vodolaz095,dc=life",
+		ReadonlyPasswd: "readonly",
+		GroupsOU:       "ou=groups,dc=vodolaz095,dc=life",
 	})
 	if err != nil {
 		t.Error(err)

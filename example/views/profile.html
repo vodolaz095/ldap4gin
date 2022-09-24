@@ -7,7 +7,7 @@
 <style>
     .wrapper {
         display: grid;
-        grid-template-columns: 40% 60%;
+        grid-template-columns: 30% 35%;
         grid-gap: 5%;
     }
     .row {
@@ -19,7 +19,11 @@
 {{ range .flashes }}
 <h3>{{ . }}</h3>
 {{ end }}
-<p><a href="/logout">Logout</a></p>
+<p>
+  <a href="/">Profile</a>
+  <a href="/groups">Groups</a>
+  <a href="/logout">Logout</a>
+</p>
 <div class="wrapper">
   <div class="row">
     <table border="1" cellpadding="3" cellspacing="0">
@@ -121,6 +125,12 @@
     </table>
   </div>
   <div class="row">
+    <p>Groups of {{.user.CommonName}}:</p>
+    <ul>
+      {{ range .user.Groups }}
+      <li><b>{{ .GID}} {{.Name}}</b> - {{.Description}}</li>
+      {{ end }}
+    </ul>
     <p>Raw representation:</p>
     <pre>{{.raw}}</pre>
   </div>

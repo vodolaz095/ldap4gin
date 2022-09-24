@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -18,21 +19,30 @@ func main() {
 	r.LoadHTMLGlob("views/*")
 	// configuring options used to connect to LDAP database
 	authenticator, err := ldap4gin.New(&ldap4gin.Options{
-		Debug:            gin.IsDebugging(),
+		Debug: gin.IsDebugging(),
+
 		ConnectionString: "ldap://127.0.0.1:389",
-		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=life",
+		ReadonlyDN:       "cn=readonly,dc=vodolaz095,dc=life",
+		ReadonlyPasswd:   "readonly",
 		TLS:              &tls.Config{}, // nearly sane default values
 		StartTLS:         false,
-		ExtraFields:      []string{"l"}, // get location too
+
+		UserBaseTpl: "uid=%s,ou=people,dc=vodolaz095,dc=life",
+		ExtraFields: []string{"l"}, // get location too
+
+		ExtractGroups: true,
+		GroupsOU:      "ou=groups,dc=vodolaz095,dc=life",
+
+		TTL: 10 * time.Second,
 	})
 	if err != nil {
 		log.Fatalf("%s : while initializing ldap4gin authenticator", err)
 	}
 	log.Println("LDAP server dialed!")
-
+	defer authenticator.Close()
 	// Application should use any of compatible sessions offered by
 	// https://github.com/gin-contrib/sessions module
-	// CAUTION:  secure cookie session storage has limits on user profile size!!!
+	// CAUTION: secure cookie session storage has limits on user profile size!!!
 	store := cookie.NewStore([]byte("secret"))
 	r.Use(sessions.Sessions("mysession", store))
 
@@ -44,7 +54,6 @@ func main() {
 		user, err := authenticator.Extract(c)
 		if err != nil {
 			if err.Error() == "unauthorized" { // render login page
-				session.AddFlash("Authorization failed")
 				session.Save()
 				c.HTML(http.StatusUnauthorized, "unauthorized.html", gin.H{
 					"flashes": flashes,
@@ -91,6 +100,23 @@ func main() {
 		}
 		session.Save()
 		c.Redirect(http.StatusFound, "/")
+	})
+
+	// page to list groups
+	r.GET("/groups", func(c *gin.Context) {
+		session := sessions.Default(c)
+		flashes := session.Flashes()
+		user, err := authenticator.Extract(c)
+		if err != nil {
+			session.AddFlash(fmt.Sprintf("Authorization error  %s", err))
+			c.Redirect(http.StatusFound, "/")
+			return
+		}
+		session.Save()
+		c.HTML(http.StatusOK, "groups.html", gin.H{
+			"user":    user,
+			"flashes": flashes,
+		})
 	})
 
 	// route to terminate session and perform logout
