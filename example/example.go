@@ -94,11 +94,17 @@ func main() {
 		if err != nil {
 			log.Printf("User %s failed to authorize from %s because of %s", username, c.ClientIP(), err.Error())
 			session.AddFlash(fmt.Sprintf("Authorization error  %s", err))
+			c.Redirect(http.StatusFound, "/")
 		} else {
 			log.Printf("User %s authorized from %s!", username, c.ClientIP())
 			session.AddFlash(fmt.Sprintf("Welcome, %s!", username))
 		}
-		session.Save()
+		user, err := authenticator.Extract(c)
+		if err != nil {
+			log.Printf("%s : while extracting user", err)
+		} else {
+			log.Printf("user %s is extracted", user.DN)
+		}
 		c.Redirect(http.StatusFound, "/")
 	})
 

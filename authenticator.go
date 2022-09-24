@@ -218,8 +218,17 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 	session := sessions.Default(c)
 	ui := session.Get(SessionKeyName)
 	if ui != nil {
-		raw := ui.(User)
-		user = &raw
+		switch ui.(type) {
+		case User:
+			raw := ui.(User)
+			user = &raw
+			break
+		case *User:
+			user = ui.(*User)
+		default:
+			err = fmt.Errorf("unknown type")
+			return
+		}
 		if a.Options.Debug {
 			fmt.Printf("ldap4gin: user %s is extracted from session of %v using %s\n",
 				user.UID, c.ClientIP(), c.GetHeader("User-Agent"))
