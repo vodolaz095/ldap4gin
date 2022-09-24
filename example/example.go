@@ -17,7 +17,7 @@ func main() {
 	r := gin.Default()
 	r.LoadHTMLGlob("views/*")
 	// configuring options used to connect to LDAP database
-	authenticator, err := ldap4gin.New(ldap4gin.Options{
+	authenticator, err := ldap4gin.New(&ldap4gin.Options{
 		Debug:            gin.IsDebugging(),
 		ConnectionString: "ldap://127.0.0.1:389",
 		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=life",

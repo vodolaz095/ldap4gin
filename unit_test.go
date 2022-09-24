@@ -34,7 +34,7 @@ func TestEnvironment(t *testing.T) {
 }
 
 func TestNewFail(t *testing.T) {
-	_, err := New(Options{
+	_, err := New(&Options{
 		Debug:            true,
 		ConnectionString: "ldap://there.is.no.ldap.example.org:389",
 		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=life",
@@ -50,7 +50,7 @@ func TestNewFail(t *testing.T) {
 }
 
 func TestNewSuccess(t *testing.T) {
-	a, err := New(Options{
+	a, err := New(&Options{
 		Debug:            true,
 		ConnectionString: "ldap://127.0.0.1:389",
 		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=life",
