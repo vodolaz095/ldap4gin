@@ -3,6 +3,7 @@ package ldap4gin
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"strings"
 	"time"
@@ -25,6 +26,12 @@ func timeOut(ctx context.Context) (timeout int) {
 	return
 }
 
+type LogDebugFunc func(ctx context.Context, format string, a ...any)
+
+var DefaultLogDebugFunc = func(ctx context.Context, format string, a ...any) {
+	log.Default().Printf("ldap4gin: "+format+"\n", a...)
+}
+
 // Authenticator links ldap and gin context together
 type Authenticator struct {
 	fields []string
@@ -32,6 +39,14 @@ type Authenticator struct {
 	Options *Options
 	// LDAPConn is ldap connection being used
 	LDAPConn *ldap.Conn
+	// LogDebugFunc is function to log debug information
+	LogDebugFunc LogDebugFunc
+}
+
+func (a *Authenticator) debug(ctx context.Context, format string, data ...any) {
+	if a.Options.Debug {
+		a.LogDebugFunc(ctx, format, data...)
+	}
 }
 
 func (a *Authenticator) bindAsUser(ctx context.Context, username, password string) (user *User, err error) {
@@ -48,6 +63,8 @@ func (a *Authenticator) bindAsUser(ctx context.Context, username, password strin
 		}
 		return
 	}
+	a.debug(ctx, "bind succeeded as %s", dn)
+
 	// Search info about given username
 	timeout := timeOut(ctx)
 	searchRequest := ldap.NewSearchRequest(
@@ -66,17 +83,19 @@ func (a *Authenticator) bindAsUser(ctx context.Context, username, password strin
 		return
 	}
 	if a.Options.Debug {
-		fmt.Println("ldap4gin: user profile found")
 		res.PrettyPrint(2)
 	}
 	if len(res.Entries) == 0 {
+		a.debug(ctx, "no user profile found for %s", username)
 		err = ErrNotFound
 		return
 	}
 	if len(res.Entries) > 1 {
+		a.debug(ctx, "multiple user profile found for %s", username)
 		err = ErrMultipleAccount
 		return
 	}
+	a.debug(ctx, "user's profile found for %s", username)
 	user, err = loadUserFromEntry(res.Entries[0])
 	return
 }
@@ -134,15 +153,12 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 
 func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	if !user.Expired() {
-		if a.Options.Debug {
-			fmt.Printf("ldap4gin: user %s will expire in %s\n",
-				user.UID, user.ExpiresAt.Sub(time.Now()).String())
-		}
+		a.debug(ctx, "user's profile %s not expired", user.UID)
 		return nil
 	}
-	if a.Options.Debug {
-		fmt.Printf("ldap4gin: user %s expired\n", user.UID)
-	}
+	a.debug(ctx, "user's profile %s expired on %s",
+		user.UID, user.ExpiresAt.Format(time.Stamp),
+	)
 	if a.Options.ReadonlyDN == "" {
 		err = fmt.Errorf("readonly distinguished name is not configured")
 		return
@@ -170,8 +186,9 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	if err != nil {
 		return
 	}
+	a.debug(ctx, "user %s profile is loaded from ldap", user.UID)
+
 	if a.Options.Debug {
-		fmt.Println("ldap4gin: user profile found")
 		res.PrettyPrint(2)
 	}
 	if len(res.Entries) == 0 {
@@ -185,6 +202,13 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	user, err = loadUserFromEntry(res.Entries[0])
 	if err != nil {
 		return
+	}
+	if a.Options.TTL > 0 {
+		user.ExpiresAt = time.Now().Add(a.Options.TTL)
+		a.debug(ctx, "user %s session will expire on %s",
+			user.UID,
+			user.ExpiresAt.Format("15:04:05"),
+		)
 	}
 	if a.Options.ExtractGroups {
 		err = a.attachGroups(ctx, user)
@@ -229,11 +253,17 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 			err = fmt.Errorf("unknown type")
 			return
 		}
-		if a.Options.Debug {
-			fmt.Printf("ldap4gin: user %s is extracted from session of %v using %s\n",
-				user.UID, c.ClientIP(), c.GetHeader("User-Agent"))
-		}
+		a.debug(c.Request.Context(), "user %s is extracted from session of %v using %s",
+			user.UID, c.ClientIP(), c.GetHeader("User-Agent"))
 		err = a.reload(c.Request.Context(), user)
+		if err != nil {
+			return
+		}
+		if user.ExpiresAt.IsZero() {
+			a.debug(c.Request.Context(), "user %s session will expire at %s",
+				user.UID, user.ExpiresAt.Format(time.Stamp),
+			)
+		}
 	} else {
 		err = ErrUnauthorized
 	}

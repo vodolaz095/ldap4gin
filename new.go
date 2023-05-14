@@ -22,5 +22,10 @@ func New(opts *Options) (a *Authenticator, err error) {
 		}
 	}
 	a.LDAPConn = conn
+	if opts.LogDebugFunc != nil {
+		a.LogDebugFunc = opts.LogDebugFunc
+	} else {
+		a.LogDebugFunc = DefaultLogDebugFunc
+	}
 	return
 }

@@ -47,10 +47,11 @@ type Options struct {
 	// NOTICE - if you add too many fields, it can hit session size limits!
 	ExtraFields []string
 
-	/*
-	  Used for extracting groups of user
-	*/
+	// ExtractGroups toggles extracting groups of user
 	ExtractGroups bool
 	// GroupsOU depicts organization unit for groups, usually "ou=groups,dc=vodolaz095,dc=ru"
 	GroupsOU string
+
+	// LogDebugFunc is called to log debug events
+	LogDebugFunc LogDebugFunc
 }

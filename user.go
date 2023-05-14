@@ -2,10 +2,11 @@ package ldap4gin
 
 import (
 	"fmt"
-	"github.com/go-ldap/ldap/v3"
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/go-ldap/ldap/v3"
 )
 
 // User depicts profile of authorized user
