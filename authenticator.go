@@ -149,7 +149,7 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 			Description: res.Entries[i].GetAttributeValue("description"),
 		}
 		a.debug(ctx, "user %s is member of %s %s %s",
-			groups[i].GID, groups[i].Name, groups[i].Description, user.UID, len(res.Entries))
+			groups[i].GID, groups[i].Name, groups[i].Description, user.UID)
 	}
 	user.Groups = groups
 	return
