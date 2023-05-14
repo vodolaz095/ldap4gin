@@ -26,8 +26,10 @@ func timeOut(ctx context.Context) (timeout int) {
 	return
 }
 
+// LogDebugFunc used to define requirements for logging function
 type LogDebugFunc func(ctx context.Context, format string, a ...any)
 
+// DefaultLogDebugFunc is used for logging by default
 var DefaultLogDebugFunc = func(ctx context.Context, format string, a ...any) {
 	log.Default().Printf("ldap4gin: "+format+"\n", a...)
 }
@@ -146,19 +148,14 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 			Name:        res.Entries[i].GetAttributeValue("cn"),
 			Description: res.Entries[i].GetAttributeValue("description"),
 		}
+		a.debug(ctx, "user %s is member of %s %s %s",
+			groups[i].GID, groups[i].Name, groups[i].Description, user.UID, len(res.Entries))
 	}
 	user.Groups = groups
 	return
 }
 
 func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
-	if !user.Expired() {
-		a.debug(ctx, "user's profile %s not expired", user.UID)
-		return nil
-	}
-	a.debug(ctx, "user's profile %s expired on %s",
-		user.UID, user.ExpiresAt.Format(time.Stamp),
-	)
 	if a.Options.ReadonlyDN == "" {
 		err = fmt.Errorf("readonly distinguished name is not configured")
 		return
@@ -186,8 +183,6 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	if err != nil {
 		return
 	}
-	a.debug(ctx, "user %s profile is loaded from ldap", user.UID)
-
 	if a.Options.Debug {
 		res.PrettyPrint(2)
 	}
@@ -205,7 +200,7 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	}
 	if a.Options.TTL > 0 {
 		user.ExpiresAt = time.Now().Add(a.Options.TTL)
-		a.debug(ctx, "user %s session will expire on %s",
+		a.debug(ctx, "set user %s to expire on %s",
 			user.UID,
 			user.ExpiresAt.Format("15:04:05"),
 		)
@@ -213,6 +208,7 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	if a.Options.ExtractGroups {
 		err = a.attachGroups(ctx, user)
 	}
+	a.debug(ctx, "user %s profile is reloaded from ldap", user.UID)
 	return
 }
 
@@ -253,17 +249,29 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 			err = fmt.Errorf("unknown type")
 			return
 		}
-		a.debug(c.Request.Context(), "user %s is extracted from session of %v using %s",
+
+		a.debug(c.Request.Context(),
+			"user %s is extracted from session of %v using %s",
 			user.UID, c.ClientIP(), c.GetHeader("User-Agent"))
-		err = a.reload(c.Request.Context(), user)
-		if err != nil {
-			return
-		}
-		if user.ExpiresAt.IsZero() {
-			a.debug(c.Request.Context(), "user %s session will expire at %s",
+
+		if user.Expired() {
+			a.debug(c.Request.Context(), "user's profile %s expired on %s %s ago, refreshing...",
 				user.UID, user.ExpiresAt.Format(time.Stamp),
+				time.Now().Sub(user.ExpiresAt).String(),
+			)
+			err = a.reload(c.Request.Context(), user)
+			if err != nil {
+				return
+			}
+			user.ExpiresAt = time.Now().Add(a.Options.TTL)
+		} else {
+			a.debug(c.Request.Context(), "user's profile %s is valid until %s for %s",
+				user.UID, user.ExpiresAt.Format(time.Stamp),
+				user.ExpiresAt.Sub(time.Now()).String(),
 			)
 		}
+		session.Set(SessionKeyName, *user)
+		err = session.Save()
 	} else {
 		err = ErrUnauthorized
 	}

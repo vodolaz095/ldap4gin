@@ -50,11 +50,11 @@ func main() {
 	r.GET("/", func(c *gin.Context) {
 		session := sessions.Default(c)
 		flashes := session.Flashes()
+		defer session.Save()
 		//  extracting user's profile from context
 		user, err := authenticator.Extract(c)
 		if err != nil {
 			if err.Error() == "unauthorized" { // render login page
-				session.Save()
 				c.HTML(http.StatusUnauthorized, "unauthorized.html", gin.H{
 					"flashes": flashes,
 				})
@@ -62,7 +62,6 @@ func main() {
 			}
 			if err.Error() == "malformed username" {
 				session.AddFlash("Malformed username")
-				session.Save()
 				c.HTML(http.StatusUnauthorized, "unauthorized.html", gin.H{
 					"flashes": flashes,
 				})
@@ -76,7 +75,6 @@ func main() {
 		for _, attr := range user.Entry.Attributes {
 			fmt.Fprintf(buff, "%s: %s\n", attr.Name, attr.Values)
 		}
-		session.Save()
 		c.HTML(http.StatusOK, "profile.html", gin.H{
 			"user":    user,
 			"flashes": flashes,
@@ -87,6 +85,7 @@ func main() {
 	// route to authorize user by username and password
 	r.POST("/login", func(c *gin.Context) {
 		session := sessions.Default(c)
+		defer session.Save()
 		username := c.PostForm("username")
 		password := c.PostForm("password")
 		log.Printf("User %s tries to authorize from %s...", username, c.ClientIP())
@@ -111,6 +110,7 @@ func main() {
 	// page to list groups
 	r.GET("/groups", func(c *gin.Context) {
 		session := sessions.Default(c)
+		defer session.Save()
 		flashes := session.Flashes()
 		user, err := authenticator.Extract(c)
 		if err != nil {
@@ -118,7 +118,6 @@ func main() {
 			c.Redirect(http.StatusFound, "/")
 			return
 		}
-		session.Save()
 		c.HTML(http.StatusOK, "groups.html", gin.H{
 			"user":    user,
 			"flashes": flashes,

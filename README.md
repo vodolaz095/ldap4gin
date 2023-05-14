@@ -35,6 +35,7 @@ import (
    "fmt"
    "log"
    "net/http"
+   "time"
 
    "github.com/gin-contrib/sessions"
    "github.com/gin-contrib/sessions/cookie"
@@ -50,31 +51,27 @@ func main() {
       Debug: gin.IsDebugging(),
 
       ConnectionString: "ldap://127.0.0.1:389",
-      ReadonlyDN:       "cn=readonly,dc=vodolaz095,dc=life", // only required, if we enable ExtractGroups:true
-      ReadonlyPasswd:   "readonly",  // only required, if we enable ExtractGroups:true
+      ReadonlyDN:       "cn=readonly,dc=vodolaz095,dc=life",
+      ReadonlyPasswd:   "readonly",
       TLS:              &tls.Config{}, // nearly sane default values
       StartTLS:         false,
 
       UserBaseTpl: "uid=%s,ou=people,dc=vodolaz095,dc=life",
       ExtraFields: []string{"l"}, // get location too
 
-      ExtractGroups: true, 
-      GroupsOU:      "ou=groups,dc=vodolaz095,dc=life",  // only required, if we enable ExtractGroups:true
+      ExtractGroups: true,
+      GroupsOU:      "ou=groups,dc=vodolaz095,dc=life",
 
-      // how long to store user's profile in session, 
-      // if profile is expired, it is reloaded from ldap database
-	  // if we set TTL to 0, profile will never expire
-      TTL: 10 * time.Second, 
+      TTL: 10 * time.Second,
    })
    if err != nil {
       log.Fatalf("%s : while initializing ldap4gin authenticator", err)
    }
    log.Println("LDAP server dialed!")
    defer authenticator.Close()
-
    // Application should use any of compatible sessions offered by
    // https://github.com/gin-contrib/sessions module
-   // CAUTION:  secure cookie session storage has limits on user profile size!!!
+   // CAUTION: secure cookie session storage has limits on user profile size!!!
    store := cookie.NewStore([]byte("secret"))
    r.Use(sessions.Sessions("mysession", store))
 
@@ -82,12 +79,11 @@ func main() {
    r.GET("/", func(c *gin.Context) {
       session := sessions.Default(c)
       flashes := session.Flashes()
+      defer session.Save()
       //  extracting user's profile from context
       user, err := authenticator.Extract(c)
       if err != nil {
          if err.Error() == "unauthorized" { // render login page
-            session.AddFlash("Authorization failed")
-            session.Save()
             c.HTML(http.StatusUnauthorized, "unauthorized.html", gin.H{
                "flashes": flashes,
             })
@@ -95,7 +91,6 @@ func main() {
          }
          if err.Error() == "malformed username" {
             session.AddFlash("Malformed username")
-            session.Save()
             c.HTML(http.StatusUnauthorized, "unauthorized.html", gin.H{
                "flashes": flashes,
             })
@@ -109,7 +104,6 @@ func main() {
       for _, attr := range user.Entry.Attributes {
          fmt.Fprintf(buff, "%s: %s\n", attr.Name, attr.Values)
       }
-      session.Save()
       c.HTML(http.StatusOK, "profile.html", gin.H{
          "user":    user,
          "flashes": flashes,
@@ -120,6 +114,7 @@ func main() {
    // route to authorize user by username and password
    r.POST("/login", func(c *gin.Context) {
       session := sessions.Default(c)
+      defer session.Save()
       username := c.PostForm("username")
       password := c.PostForm("password")
       log.Printf("User %s tries to authorize from %s...", username, c.ClientIP())
@@ -127,11 +122,17 @@ func main() {
       if err != nil {
          log.Printf("User %s failed to authorize from %s because of %s", username, c.ClientIP(), err.Error())
          session.AddFlash(fmt.Sprintf("Authorization error  %s", err))
+         c.Redirect(http.StatusFound, "/")
       } else {
          log.Printf("User %s authorized from %s!", username, c.ClientIP())
          session.AddFlash(fmt.Sprintf("Welcome, %s!", username))
       }
-      session.Save()
+      user, err := authenticator.Extract(c)
+      if err != nil {
+         log.Printf("%s : while extracting user", err)
+      } else {
+         log.Printf("user %s is extracted", user.DN)
+      }
       c.Redirect(http.StatusFound, "/")
    })
 
