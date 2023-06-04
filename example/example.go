@@ -94,6 +94,7 @@ func main() {
 			log.Printf("User %s failed to authorize from %s because of %s", username, c.ClientIP(), err.Error())
 			session.AddFlash(fmt.Sprintf("Authorization error  %s", err))
 			c.Redirect(http.StatusFound, "/")
+			return
 		} else {
 			log.Printf("User %s authorized from %s!", username, c.ClientIP())
 			session.AddFlash(fmt.Sprintf("Welcome, %s!", username))

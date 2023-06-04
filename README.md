@@ -123,6 +123,7 @@ func main() {
          log.Printf("User %s failed to authorize from %s because of %s", username, c.ClientIP(), err.Error())
          session.AddFlash(fmt.Sprintf("Authorization error  %s", err))
          c.Redirect(http.StatusFound, "/")
+         return
       } else {
          log.Printf("User %s authorized from %s!", username, c.ClientIP())
          session.AddFlash(fmt.Sprintf("Welcome, %s!", username))
@@ -160,7 +161,7 @@ Shortly, these steps are performed in this module module:
 1. we build DN using `username` parameter provided and `UserBaseTpl` of options
 
 ```go
-    
+
     authenticator, err := ldap4gin.New(ldap4gin.Options{
         Debug:            gin.IsDebugging(),
         ConnectionString: "ldap://127.0.0.1:389",
@@ -193,7 +194,7 @@ Shortly, these steps are performed in this module module:
 
 searchRequest := ldap.NewSearchRequest(
     dn,                                // base DN
-    ldap.ScopeBaseObject,              // scope 
+    ldap.ScopeBaseObject,              // scope
     ldap.NeverDerefAliases,            // DerefAliases
     0,                                 // size limit
     timeout,                           // timeout
