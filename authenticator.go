@@ -58,7 +58,7 @@ func (a *Authenticator) debug(ctx context.Context, format string, data ...any) {
 }
 
 func (a *Authenticator) bindAsUser(ctx context.Context, username, password string) (user *User, err error) {
-	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "bindAsUser",
+	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin:bindAsUser",
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 	defer span.End()
@@ -137,7 +137,7 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 		return
 	}
 	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").
-		Start(ctx, "attachGroups",
+		Start(ctx, "ldap4gin:attachGroups",
 			trace.WithSpanKind(trace.SpanKindClient),
 		)
 	defer span.End()
@@ -202,15 +202,16 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 		err = fmt.Errorf("readonlyPassword password is not set")
 		return
 	}
-	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "reload",
+	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin:reload",
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 	defer span.End()
-
+	span.AddEvent("Binding as readonly...")
 	err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
 	if err != nil {
 		return
 	}
+	span.AddEvent("Searching user profile")
 	searchRequest := ldap.NewSearchRequest(
 		user.DN,                           // base DN
 		ldap.ScopeBaseObject,              // scope
@@ -224,6 +225,8 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	)
 	res, err := a.LDAPConn.Search(searchRequest)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return
 	}
 	if a.Options.Debug {
@@ -237,6 +240,7 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 		err = ErrMultipleAccount
 		return
 	}
+	span.AddEvent("user profile is found")
 	user, err = loadUserFromEntry(res.Entries[0])
 	if err != nil {
 		return
@@ -250,7 +254,11 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	}
 	if a.Options.ExtractGroups {
 		err = a.attachGroups(ctx, user)
+		if err != nil {
+			return
+		}
 	}
+	span.AddEvent("user profile is reloaded from ldap")
 	a.debug(ctx, "user %s profile is reloaded from ldap", user.UID)
 	return
 }
@@ -284,6 +292,7 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 		user.ExpiresAt = time.Now().Add(a.Options.TTL)
 	}
 	session.Set(SessionKeyName, user)
+	span.AddEvent("user authorized properly")
 	err = session.Save()
 	return
 }
@@ -334,6 +343,7 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 		session.Set(SessionKeyName, *user)
 		err = session.Save()
 	} else {
+		span.AddEvent("user session is not found")
 		err = ErrUnauthorized
 	}
 	return

@@ -1,0 +1,46 @@
+version: "3.11"
+
+volumes:
+  ldap:
+  slapdd:
+
+services:
+  jaeger:
+    container_name: jaeger
+    image: jaegertracing/all-in-one:1.37
+    ports:
+      - "16686:16686"    # webui is listening
+      - "6831:6831/udp"  # accepting spans in compact thrift format over udp
+
+  ldap:
+    image: osixia/openldap:1.4.0
+    environment:
+      LDAP_ORGANISATION: "OldCity"
+      LDAP_DOMAIN: "vodolaz095.life"
+      LDAP_ADMIN_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
+      LDAP_READONLY_USER: "true"
+      LDAP_READONLY_USER_USERNAME: "readonly"
+      LDAP_READONLY_USER_PASSWORD: "readonly"
+    volumes:
+      - ldap:/var/lib/ldap
+      - slapdd:/etc/ldap/slapd.d
+    ports:
+      - "389:389"
+      - "636:636"
+
+  lam:
+    image: ldapaccountmanager/lam:stable
+    environment:
+      # https://github.com/LDAPAccountManager/lam/blob/develop/lam-packaging/docker/.env
+      LDAP_DOMAIN: "vodolaz095.life"
+      LDAP_ORGANISATION: "OldCity"
+      LDAP_ADMIN_PASSWORD: "hopecult"
+      LDAP_READONLY_USER_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
+      LDAP_USERS_DN: "ou=people,dc=vodolaz095,dc=life"
+      LDAP_GROUPS_DN: "ou=groups,dc=vodolaz095,dc=life"
+      LDAP_SERVER: "ldap://ldap:389"
+      LDAP_USER: "cn=admin,dc=vodolaz095,dc=life"
+      LAM_LANG: "en_US"
+      LAM_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
+    ports:
+      - "8085:80"

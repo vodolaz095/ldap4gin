@@ -23,7 +23,10 @@ Code was tested against popular [osixia/openldap:1.4.0](https://hub.docker.com/r
 with records generated using [ldapaccountmanager/lam](https://hub.docker.com/r/ldapaccountmanager/lam) web ui.
 
 # Example
-Working example is published in `example/` subdirectory of this repo
+Working example is published in `example/` subdirectory of this repo.
+In order to get working ldap server you need to start it with
+[docker compose up -d](https://docs.docker.com/compose/install/) and then edit users and groups in 
+[LDAP Account Manager](https://github.com/LDAPAccountManager/lam) on http://127.0.0.1:8085/lam/templates/login.php
 
 ```go
 
@@ -156,7 +159,7 @@ How it works?
 
 You can read [very good article in Russian language describing authentication process via LDAP](https://vodolaz095.ru/nodejs-openldap/).
 
-Shortly, these steps are performed in this module module:
+Shortly, these steps are performed in this module:
 
 1. we build DN using `username` parameter provided and `UserBaseTpl` of options
 
@@ -212,6 +215,17 @@ searchRequest := ldap.NewSearchRequest(
 
 5. If we enable extraction of groups by setting  `ExtractGroups:true`, we will also perform bind by specual user
    with readonly access to all database in order to load groups of user we want to authenticate
+
+# Testing 
+
+1. `docker compose up -d`
+2. Create test user account in LAM - http://127.0.0.1:8085/lam/templates/login.php, default password is `someRandomPasswordToMakeHackersSad22223338888`
+3. Set test user's username and password as environment variables `TEST_LDAP_USERNAME` and `TEST_LDAP_PASSWORD` 
+4. Run tests by `make check`
+5. Run example my `make start` and try to authorize as test user
+6. Observe traces in Jaeger on http://127.0.0.1:16686/ for app `ldap4gin_example`
+
+![spans.png](docs%2Fspans.png)
 
 # MIT License
 

@@ -8,5 +8,6 @@ import (
 func init() {
 	gob.Register(User{})
 	gob.Register(Group{})
-	usernameRegexp = regexp.MustCompile("^[0-9A-Za-z_]+$")
+	// https://unix.stackexchange.com/a/435120/229266
+	usernameRegexp = regexp.MustCompile("^[a-z_]([a-z0-9_-]{0,31}|[a-z0-9_-]{0,30}\\$)$")
 }
