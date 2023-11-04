@@ -2,7 +2,7 @@
 Authenticator for gin framework using ldap server
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/vodolaz095/ldap4gin)](https://goreportcard.com/report/github.com/vodolaz095/ldap4gin)
-[![GoDoc](https://godoc.org/github.com/vodolaz095/ldap4gin?status.svg)](https://godoc.org/github.com/vodolaz095/ldap4gin)
+[![GoDoc](https://pkg.go.dev/badge/github.com/vodolaz095/ldap4gin?status.svg)](https://pkg.go.dev/github.com/vodolaz095/ldap4gin?tab=doc)
 
 
 # Advertisement

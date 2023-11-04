@@ -34,7 +34,7 @@ services:
       # https://github.com/LDAPAccountManager/lam/blob/develop/lam-packaging/docker/.env
       LDAP_DOMAIN: "vodolaz095.life"
       LDAP_ORGANISATION: "OldCity"
-      LDAP_ADMIN_PASSWORD: "hopecult"
+      LDAP_ADMIN_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
       LDAP_READONLY_USER_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
       LDAP_USERS_DN: "ou=people,dc=vodolaz095,dc=life"
       LDAP_GROUPS_DN: "ou=groups,dc=vodolaz095,dc=life"
