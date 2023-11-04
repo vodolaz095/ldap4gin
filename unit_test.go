@@ -1,9 +1,10 @@
 package ldap4gin
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -41,7 +42,7 @@ func TestNewFail(t *testing.T) {
 		ExtraFields:      []string{"l"}, // get location too
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "lookup there.is.no.ldap.example.org: no such host") {
+		if strings.Contains(err.Error(), "LDAP Result Code 200 \"Network Error\": dial tcp: lookup there.is.no.ldap.example.org on") {
 			return
 		}
 		t.Error(err)
@@ -57,6 +58,9 @@ func TestNewSuccess(t *testing.T) {
 		ExtraFields:      []string{"l"}, // get location too
 		TLS: &tls.Config{
 			InsecureSkipVerify: true, // NEVER DO IT
+		},
+		LogDebugFunc: func(_ context.Context, format string, a ...any) {
+			t.Logf(format, a...)
 		},
 		ExtractGroups:  true,
 		ReadonlyDN:     "cn=readonly,dc=vodolaz095,dc=life",
@@ -134,7 +138,7 @@ func TestUnauthorized(t *testing.T) {
 
 func TestAuthenticator_Authorize_fail(t *testing.T) {
 	data := url.Values{}
-	data.Add("username", "thisIsUserNeverExistedInLDAP")
+	data.Add("username", "nonexistent")
 	data.Add("password", "someRandomPasswordNobodyUses")
 	t.Logf("Body encoded - %s", data.Encode())
 	req := httptest.NewRequest(
@@ -150,9 +154,27 @@ func TestAuthenticator_Authorize_fail(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "wrong status code")
 }
 
-func TestAuthenticator_Authorize_malformed(t *testing.T) {
+func TestAuthenticator_Authorize_malformed1(t *testing.T) {
 	data := url.Values{}
-	data.Add("username", "thisIsMalformedUsername)}")
+	data.Add("username", "thisIsMalformed)}")
+	data.Add("password", "someRandomPasswordNobodyUses")
+	t.Logf("Body encoded - %s", data.Encode())
+	req := httptest.NewRequest(
+		"POST",
+		"http://russian.rt.com/login",
+		strings.NewReader(data.Encode()),
+	) // GIN engine should ignore HOSTNAME in header, so its ok if i provide it here
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+	w := httptest.NewRecorder()
+	app.ServeHTTP(w, req)
+	resp := w.Result()
+	assert.Equal(t, http.StatusTeapot, resp.StatusCode, "wrong status code")
+}
+
+func TestAuthenticator_Authorize_malformed2(t *testing.T) {
+	data := url.Values{}
+	data.Add("username", "ThisIsMalformed")
 	data.Add("password", "someRandomPasswordNobodyUses")
 	t.Logf("Body encoded - %s", data.Encode())
 	req := httptest.NewRequest(
@@ -209,7 +231,7 @@ func TestAuthenticator_Extract_pass(t *testing.T) {
 	app.ServeHTTP(w, req)
 	resp := w.Result()
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "wrong status code")
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Error(err)
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
@@ -73,6 +74,15 @@ func (u *User) HasGroupByName(name string) (ok bool) {
 		ok = u.Groups[i].GID == name
 	}
 	return
+}
+
+// PrintGroups returns string of user groups in easy to read format
+func (u *User) PrintGroups() string {
+	out := make([]string, len(u.Groups))
+	for i := range u.Groups {
+		out[i] = fmt.Sprintf("%s(%s)", u.Groups[i].Name, u.Groups[i].GID)
+	}
+	return strings.Join(out, ",")
 }
 
 // GetDefaultFields returns fields we extract from LDAP by default
