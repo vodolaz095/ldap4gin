@@ -3,6 +3,12 @@ golint:
 	cd ~ && go get -u golang.org/x/lint/golint
 	golint
 
+# https://go.dev/blog/govulncheck
+# install it by go install golang.org/x/vuln/cmd/govulncheck@latest
+vuln:
+	which govulncheck
+	govulncheck ./...
+
 deps:
 	# install all dependencies required for running application
 

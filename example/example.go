@@ -172,6 +172,21 @@ func main() {
 		})
 	})
 
+	// ensure caching works
+	r.GET("/cached", func(c *gin.Context) {
+		user, errC := authenticator.Extract(c)
+		if errC != nil {
+			c.String(http.StatusInternalServerError, "error extracting user profile: %s", errC.Error())
+			return
+		}
+		userDup, errC := authenticator.Extract(c)
+		if errC != nil {
+			c.String(http.StatusInternalServerError, "error extracting user profile: %s", errC.Error())
+			return
+		}
+		c.String(http.StatusOK, "1st user: %s, 2nd user: %s", user, userDup)
+	})
+
 	// route to terminate session and perform logout
 	r.GET("/logout", func(c *gin.Context) {
 		authenticator.Logout(c)

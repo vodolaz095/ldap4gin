@@ -21,6 +21,7 @@
 {{ end }}
 <p>
   <a href="/">Profile</a>
+  <a href="/cached">Cache</a>
   <a href="/groups">Groups</a>
   <a href="/logout">Logout</a>
 </p>
@@ -30,6 +31,13 @@
       <tr>
         <th>Parameter</th>
         <th>Value</th>
+      </tr>
+      <tr>
+        <th colspan="2">Cache</th>
+      </tr>
+      <tr>
+        <td>Expires at:</td>
+        <td>{{.user.ExpiresAt.Format "15:04:05" }}</td>
       </tr>
       <tr>
         <th colspan="2">General</th>

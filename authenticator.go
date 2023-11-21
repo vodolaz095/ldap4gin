@@ -19,6 +19,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// MetadataKeyName names key used to store user profile in request metadata
+const MetadataKeyName = "ldap4gin_meta"
+
 // SessionKeyName names key used to store user profile in session
 const SessionKeyName = "ldap4gin_user"
 
@@ -300,6 +303,12 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 // Extract extracts users profile from session
 func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 	span := trace.SpanFromContext(c.Request.Context())
+	userFromMeta, found := c.Get(MetadataKeyName)
+	if found {
+		span.AddEvent("user profile extracted from metadata")
+		return userFromMeta.(*User), nil
+	}
+	span.AddEvent("extracting user profile from session")
 	session := sessions.Default(c)
 	ui := session.Get(SessionKeyName)
 	if ui != nil {
@@ -341,6 +350,7 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 		span.SetAttributes(semconv.EnduserID(user.DN))
 		span.SetAttributes(semconv.EnduserRole(user.PrintGroups()))
 		session.Set(SessionKeyName, *user)
+		c.Set(MetadataKeyName, user)
 		err = session.Save()
 	} else {
 		span.AddEvent("user session is not found")

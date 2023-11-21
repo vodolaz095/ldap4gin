@@ -85,6 +85,11 @@ func (u *User) PrintGroups() string {
 	return strings.Join(out, ",")
 }
 
+// String returns pretty print repserentation for user
+func (u *User) String() string {
+	return u.CommonName + "(" + u.DN + ")"
+}
+
 // GetDefaultFields returns fields we extract from LDAP by default
 func GetDefaultFields() []string {
 	return []string{
