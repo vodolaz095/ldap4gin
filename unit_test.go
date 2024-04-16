@@ -74,6 +74,13 @@ func TestNewSuccess(t *testing.T) {
 	authenticator = a
 }
 
+func TestAuthenticator_Ping(t *testing.T) {
+	err := authenticator.Ping(context.Background())
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestAuthenticatorClient(t *testing.T) {
 	result, err := authenticator.LDAPConn.WhoAmI(nil)
 	if err != nil {

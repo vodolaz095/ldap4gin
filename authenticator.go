@@ -72,13 +72,47 @@ func (a *Authenticator) bindAsUser(ctx context.Context, username, password strin
 	}
 	dn := fmt.Sprintf(a.Options.UserBaseTpl, username)
 	span.SetAttributes(attribute.String("bind.dn", dn))
+	span.AddEvent("preparing to bind as target user...")
 	err = a.LDAPConn.Bind(dn, password)
 	if err != nil {
+		// if we had lost ldap connection and have something like this
+		// `LDAP Result Code 200 "Network Error": ldap: connection closed"`
+		// we redial connection and bind one more time
+		if strings.Contains(err.Error(), "LDAP Result Code 200") {
+			span.AddEvent("ldap connection is lost, restoring...")
+			conn, err1 := ldap.DialURL(a.Options.ConnectionString, ldap.DialWithTLSConfig(a.Options.TLS))
+			if err1 != nil {
+				return nil, err1
+			}
+			if a.Options.StartTLS {
+				span.AddEvent("starting tls...")
+				err1 = conn.StartTLS(a.Options.TLS)
+				if err1 != nil {
+					return nil, err1
+				}
+			}
+			a.LDAPConn = conn
+			span.AddEvent("connection established, binding one more time...")
+			err1 = a.LDAPConn.Bind(dn, password)
+			if err1 != nil {
+				if strings.Contains(err1.Error(), "LDAP Result Code 49") {
+					span.AddEvent("invalid credentials")
+					err = ErrInvalidCredentials
+					return
+				}
+				// unexpected error
+				span.RecordError(err1)
+				span.SetStatus(codes.Error, err1.Error())
+				return
+			}
+		}
+		// wrong credentials
 		if strings.Contains(err.Error(), "LDAP Result Code 49") {
 			span.AddEvent("invalid credentials")
 			err = ErrInvalidCredentials
 			return
 		}
+		// unexpected error
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return
