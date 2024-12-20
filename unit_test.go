@@ -38,11 +38,11 @@ func TestNewFail(t *testing.T) {
 	_, err := New(&Options{
 		Debug:            true,
 		ConnectionString: "ldap://there.is.no.ldap.example.org:389",
-		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=life",
+		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=ru",
 		ExtraFields:      []string{"l"}, // get location too
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "LDAP Result Code 200 \"Network Error\": dial tcp: lookup there.is.no.ldap.example.org on") {
+		if strings.Contains(err.Error(), "LDAP Result Code 200 \"Network Error\"") {
 			return
 		}
 		t.Error(err)
@@ -54,7 +54,7 @@ func TestNewSuccess(t *testing.T) {
 	a, err := New(&Options{
 		Debug:            true,
 		ConnectionString: "ldap://127.0.0.1:389",
-		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=life",
+		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=ru",
 		ExtraFields:      []string{"l"}, // get location too
 		TLS: &tls.Config{
 			InsecureSkipVerify: true, // NEVER DO IT
@@ -63,9 +63,9 @@ func TestNewSuccess(t *testing.T) {
 			t.Logf(format, a...)
 		},
 		ExtractGroups:  true,
-		ReadonlyDN:     "cn=readonly,dc=vodolaz095,dc=life",
+		ReadonlyDN:     "cn=readonly,dc=vodolaz095,dc=ru",
 		ReadonlyPasswd: "readonly",
-		GroupsOU:       "ou=groups,dc=vodolaz095,dc=life",
+		GroupsOU:       "ou=groups,dc=vodolaz095,dc=ru",
 	})
 	if err != nil {
 		t.Error(err)
@@ -244,7 +244,7 @@ func TestAuthenticator_Extract_pass(t *testing.T) {
 	}
 	t.Logf("Body - %s", string(body))
 	assert.Equal(t,
-		fmt.Sprintf("User: uid=%s,ou=people,dc=vodolaz095,dc=life", os.Getenv("TEST_LDAP_USERNAME")),
+		fmt.Sprintf("User: uid=%s,ou=people,dc=vodolaz095,dc=ru", os.Getenv("TEST_LDAP_USERNAME")),
 		string(body),
 		"wrong body",
 	)

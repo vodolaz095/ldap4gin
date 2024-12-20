@@ -9,14 +9,14 @@ services:
     container_name: jaeger
     image: jaegertracing/all-in-one:1.37
     ports:
-      - "16686:16686"    # webui is listening
-      - "6831:6831/udp"  # accepting spans in compact thrift format over udp
+      - "16686:16686" # webui is listening
+      - "6831:6831/udp" # accepting spans in compact thrift format over udp
 
   ldap:
     image: osixia/openldap:1.4.0
     environment:
       LDAP_ORGANISATION: "OldCity"
-      LDAP_DOMAIN: "vodolaz095.life"
+      LDAP_DOMAIN: "vodolaz095.ru"
       LDAP_ADMIN_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
       LDAP_READONLY_USER: "true"
       LDAP_READONLY_USER_USERNAME: "readonly"
@@ -32,14 +32,14 @@ services:
     image: ldapaccountmanager/lam:stable
     environment:
       # https://github.com/LDAPAccountManager/lam/blob/develop/lam-packaging/docker/.env
-      LDAP_DOMAIN: "vodolaz095.life"
+      LDAP_DOMAIN: "vodolaz095.ru"
       LDAP_ORGANISATION: "OldCity"
       LDAP_ADMIN_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
       LDAP_READONLY_USER_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
-      LDAP_USERS_DN: "ou=people,dc=vodolaz095,dc=life"
-      LDAP_GROUPS_DN: "ou=groups,dc=vodolaz095,dc=life"
+      LDAP_USERS_DN: "ou=people,dc=vodolaz095,dc=ru"
+      LDAP_GROUPS_DN: "ou=groups,dc=vodolaz095,dc=ru"
       LDAP_SERVER: "ldap://ldap:389"
-      LDAP_USER: "cn=admin,dc=vodolaz095,dc=life"
+      LDAP_USER: "cn=admin,dc=vodolaz095,dc=ru"
       LAM_LANG: "en_US"
       LAM_PASSWORD: "someRandomPasswordToMakeHackersSad22223338888"
     ports:

@@ -67,16 +67,16 @@ func main() {
 		Debug: gin.IsDebugging(),
 
 		ConnectionString: "ldap://127.0.0.1:389",
-		ReadonlyDN:       "cn=readonly,dc=vodolaz095,dc=life",
+		ReadonlyDN:       "cn=readonly,dc=vodolaz095,dc=ru",
 		ReadonlyPasswd:   "readonly",
 		TLS:              &tls.Config{}, // nearly sane default values
 		StartTLS:         false,
 
-		UserBaseTpl: "uid=%s,ou=people,dc=vodolaz095,dc=life",
+		UserBaseTpl: "uid=%s,ou=people,dc=vodolaz095,dc=ru",
 		ExtraFields: []string{"l"}, // get location too
 
 		ExtractGroups: true,
-		GroupsOU:      "ou=groups,dc=vodolaz095,dc=life",
+		GroupsOU:      "ou=groups,dc=vodolaz095,dc=ru",
 
 		TTL: 10 * time.Second,
 	})
