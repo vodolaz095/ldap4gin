@@ -1,12 +1,15 @@
 package ldap4gin
 
 import (
+	"sync"
+
 	"github.com/go-ldap/ldap/v3"
 )
 
 // New creates new authenticator using options provided
 func New(opts *Options) (a *Authenticator, err error) {
 	a = &Authenticator{
+		mu:      &sync.Mutex{},
 		Options: opts,
 	}
 	a.fields = GetDefaultFields()

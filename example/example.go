@@ -66,7 +66,7 @@ func main() {
 	authenticator, err := ldap4gin.New(&ldap4gin.Options{
 		Debug: gin.IsDebugging(),
 
-		ConnectionString: "ldap://127.0.0.1:389",
+		ConnectionString: "ldap://127.0.0.1:1389",
 		ReadonlyDN:       "cn=readonly,dc=vodolaz095,dc=ru",
 		ReadonlyPasswd:   "readonly",
 		TLS:              &tls.Config{}, // nearly sane default values
@@ -185,6 +185,15 @@ func main() {
 			return
 		}
 		c.String(http.StatusOK, "1st user: %s, 2nd user: %s", user, userDup)
+	})
+
+	r.GET("/ping", func(c *gin.Context) {
+		err := authenticator.Ping(c.Request.Context())
+		if err != nil {
+			c.String(http.StatusInternalServerError, "error pinging: %s", err.Error())
+			return
+		}
+		c.String(http.StatusOK, "pong")
 	})
 
 	// route to terminate session and perform logout

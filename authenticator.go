@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -45,6 +46,7 @@ var DefaultLogDebugFunc = func(ctx context.Context, format string, a ...any) {
 
 // Authenticator links ldap and gin context together
 type Authenticator struct {
+	mu     *sync.Mutex
 	fields []string
 	// Options are runtime options as received from New
 	Options *Options
@@ -61,7 +63,7 @@ func (a *Authenticator) debug(ctx context.Context, format string, data ...any) {
 }
 
 func (a *Authenticator) bindAsUser(ctx context.Context, username, password string) (user *User, err error) {
-	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin:bindAsUser",
+	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.bindAsUser",
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 	defer span.End()
@@ -239,7 +241,7 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 		err = fmt.Errorf("readonlyPassword password is not set")
 		return
 	}
-	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin:reload",
+	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.reload",
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 	defer span.End()
@@ -302,6 +304,8 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 
 // Authorize tries to find user in ldap database, check his/her password via `bind` and populate session, if password matches
 func (a *Authenticator) Authorize(c *gin.Context, username, password string) (err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	span := trace.SpanFromContext(c.Request.Context())
 	session := sessions.Default(c)
 	span.SetAttributes(attribute.String("username.raw", username))
@@ -336,6 +340,8 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 
 // Extract extracts users profile from session
 func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	span := trace.SpanFromContext(c.Request.Context())
 	userFromMeta, found := c.Get(MetadataKeyName)
 	if found {
@@ -395,6 +401,8 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 
 // Logout terminates user's session
 func (a *Authenticator) Logout(c *gin.Context) (err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	session := sessions.Default(c)
 	session.Delete(SessionKeyName)
 	err = session.Save()

@@ -25,8 +25,8 @@ services:
       - ldap:/var/lib/ldap
       - slapdd:/etc/ldap/slapd.d
     ports:
-      - "389:389"
-      - "636:636"
+      - "1389:389"
+      - "1636:636"
 
   lam:
     image: ldapaccountmanager/lam:stable
