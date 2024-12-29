@@ -71,7 +71,7 @@ func (u *User) HasGroupByName(name string) (ok bool) {
 		if ok {
 			break
 		}
-		ok = u.Groups[i].GID == name
+		ok = u.Groups[i].Name == name
 	}
 	return
 }
