@@ -2,8 +2,8 @@ package ldap4gin
 
 import (
 	"context"
-	"strings"
 
+	"github.com/go-ldap/ldap/v3"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -12,8 +12,6 @@ import (
 
 // Ping ensures connection to ldap server is responding
 func (a *Authenticator) Ping(ctx context.Context) (err error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.ping",
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
@@ -23,7 +21,7 @@ func (a *Authenticator) Ping(ctx context.Context) (err error) {
 	span.SetAttributes(attribute.String("bind.readonly_dn", a.Options.ReadonlyDN))
 	err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
 	if err != nil {
-		if strings.Contains(err.Error(), "LDAP Result Code 49") {
+		if ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) {
 			span.AddEvent("invalid credentials for readonly user")
 			err = ErrReadonlyWrongCredentials
 			return

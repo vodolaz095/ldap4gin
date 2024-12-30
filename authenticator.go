@@ -46,14 +46,15 @@ var DefaultLogDebugFunc = func(ctx context.Context, format string, a ...any) {
 
 // Authenticator links ldap and gin context together
 type Authenticator struct {
-	mu     *sync.Mutex
-	fields []string
 	// Options are runtime options as received from New
 	Options *Options
 	// LDAPConn is ldap connection being used
 	LDAPConn *ldap.Conn
 	// LogDebugFunc is function to log debug information
 	LogDebugFunc LogDebugFunc
+
+	mu     *sync.Mutex
+	fields []string
 }
 
 func (a *Authenticator) debug(ctx context.Context, format string, data ...any) {
@@ -62,8 +63,41 @@ func (a *Authenticator) debug(ctx context.Context, format string, data ...any) {
 	}
 }
 
+func (a *Authenticator) checkConnection(ctx context.Context) (err error) {
+	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.checkConnection",
+		trace.WithSpanKind(trace.SpanKindClient),
+	)
+	defer span.End()
+	err = a.Ping(ctx)
+	if err != nil {
+		switch {
+		case errors.Is(err, ldap.ErrNilConnection), ldap.IsErrorWithCode(err, ldap.ErrorNetwork):
+			a.LDAPConn, err = ldap.DialURL(a.Options.ConnectionString, ldap.DialWithTLSConfig(a.Options.TLS))
+			if err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return err
+			}
+			if a.Options.StartTLS {
+				err = a.LDAPConn.StartTLS(a.Options.TLS)
+				if err != nil {
+					span.SetStatus(codes.Error, err.Error())
+					return err
+				}
+			}
+			span.AddEvent("connection is restored")
+			return nil
+
+		default:
+			span.SetStatus(codes.Error, err.Error())
+			return err
+		}
+	}
+	span.AddEvent("connection is alive")
+	return nil
+}
+
 func (a *Authenticator) bindAsUser(ctx context.Context, username, password string) (user *User, err error) {
-	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.bindAsUser",
+	ctx2, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.bindAsUser",
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 	defer span.End()
@@ -71,6 +105,10 @@ func (a *Authenticator) bindAsUser(ctx context.Context, username, password strin
 		span.AddEvent("username malformed")
 		err = ErrMalformed
 		return
+	}
+	err = a.checkConnection(ctx2)
+	if err != nil {
+		return nil, err
 	}
 	dn := fmt.Sprintf(a.Options.UserBaseTpl, username)
 	span.SetAttributes(attribute.String("bind.dn", dn))
@@ -183,6 +221,10 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 	span.AddEvent("binding as readonly")
 	span.SetAttributes(attribute.String("bind.readonly_dn", a.Options.ReadonlyDN))
 	span.SetAttributes(semconv.EnduserID(user.DN))
+	err = a.checkConnection(ctx)
+	if err != nil {
+		return
+	}
 	err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
 	if err != nil {
 		if strings.Contains(err.Error(), "LDAP Result Code 49") {
@@ -246,6 +288,10 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 	)
 	defer span.End()
 	span.AddEvent("Binding as readonly...")
+	err = a.checkConnection(ctx)
+	if err != nil {
+		return
+	}
 	err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
 	if err != nil {
 		return
@@ -400,17 +446,13 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 }
 
 // Logout terminates user's session
-func (a *Authenticator) Logout(c *gin.Context) (err error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+func (a *Authenticator) Logout(c *gin.Context) error {
 	session := sessions.Default(c)
 	session.Delete(SessionKeyName)
-	err = session.Save()
-	return
+	return session.Save()
 }
 
 // Close closes authenticator connection to ldap
-func (a *Authenticator) Close() (err error) {
-	err = a.LDAPConn.Unbind()
-	return
+func (a *Authenticator) Close() error {
+	return a.LDAPConn.Unbind()
 }

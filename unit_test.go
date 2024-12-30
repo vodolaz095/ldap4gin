@@ -26,20 +26,41 @@ const sessionCookieName = "mysession"
 
 var testUsername string
 var testPassword string
+var connectionString string
 
 func TestEnvironment(t *testing.T) {
 	testUsername = os.Getenv("TEST_LDAP_USERNAME")
 	assert.NotEmpty(t, testUsername, "test username is not set")
 	testPassword = os.Getenv("TEST_LDAP_PASSWORD")
 	assert.NotEmpty(t, testPassword, "test password is not set")
+	connectionString = os.Getenv("TEST_LDAP_URL")
+	assert.NotEmpty(t, connectionString, "test password is not set")
 }
 
-func TestNewFail(t *testing.T) {
+func TestNewFailEmpty(t *testing.T) {
 	_, err := New(&Options{
 		Debug:            true,
 		ConnectionString: "ldap://there.is.no.ldap.example.org:389",
 		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=ru",
 		ExtraFields:      []string{"l"}, // get location too
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "LDAP Result Code 206 \"Empty password not allowed by the client\"") {
+			return
+		}
+		t.Error(err)
+	}
+	t.Errorf("we connected to non existent ldap?")
+}
+
+func TestNewFailNetworkError(t *testing.T) {
+	_, err := New(&Options{
+		Debug:            true,
+		ConnectionString: "ldap://there.is.no.ldap.example.org:389",
+		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=ru",
+		ExtraFields:      []string{"l"}, // get location too
+		ReadonlyDN:       "cn=readonly,dc=vodolaz095,dc=ru",
+		ReadonlyPasswd:   "readonly",
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "LDAP Result Code 200 \"Network Error\"") {
@@ -53,7 +74,7 @@ func TestNewFail(t *testing.T) {
 func TestNewSuccess(t *testing.T) {
 	a, err := New(&Options{
 		Debug:            true,
-		ConnectionString: "ldap://127.0.0.1:389",
+		ConnectionString: connectionString,
 		UserBaseTpl:      "uid=%s,ou=people,dc=vodolaz095,dc=ru",
 		ExtraFields:      []string{"l"}, // get location too
 		TLS: &tls.Config{
@@ -69,6 +90,7 @@ func TestNewSuccess(t *testing.T) {
 	})
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	t.Logf("Authenticator initialized")
 	authenticator = a
