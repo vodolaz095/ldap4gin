@@ -103,6 +103,17 @@ func TestAuthenticator_Ping(t *testing.T) {
 	}
 }
 
+func TestAuthenticator_PingRestoresConnection(t *testing.T) {
+	err := authenticator.LDAPConn.Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = authenticator.Ping(context.Background())
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestAuthenticatorClient(t *testing.T) {
 	result, err := authenticator.LDAPConn.WhoAmI(nil)
 	if err != nil {
