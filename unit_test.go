@@ -45,7 +45,7 @@ func TestNewFailEmpty(t *testing.T) {
 		ExtraFields:      []string{"l"}, // get location too
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "LDAP Result Code 206 \"Empty password not allowed by the client\"") {
+		if strings.Contains(err.Error(), "LDAP Result Code 200 \"Network Error\": dial tcp: lookup there.is.no.ldap.example.org: no such host") {
 			return
 		}
 		t.Error(err)

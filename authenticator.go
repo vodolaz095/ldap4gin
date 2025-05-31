@@ -41,7 +41,12 @@ type LogDebugFunc func(ctx context.Context, format string, a ...any)
 
 // DefaultLogDebugFunc is used for logging by default
 var DefaultLogDebugFunc = func(ctx context.Context, format string, a ...any) {
-	log.Default().Printf("ldap4gin: "+format+"\n", a...)
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().HasTraceID() {
+		log.Default().Printf("ldap4gin ["+span.SpanContext().TraceID().String()+"]: "+format+"\n", a...)
+	} else {
+		log.Default().Printf("ldap4gin: "+format+"\n", a...)
+	}
 }
 
 // Authenticator links ldap and gin context together
@@ -53,8 +58,9 @@ type Authenticator struct {
 	// LogDebugFunc is function to log debug information
 	LogDebugFunc LogDebugFunc
 
-	mu     *sync.Mutex
-	fields []string
+	currentBind string
+	mu          *sync.Mutex
+	fields      []string
 }
 
 func (a *Authenticator) debug(ctx context.Context, format string, data ...any) {
@@ -63,41 +69,8 @@ func (a *Authenticator) debug(ctx context.Context, format string, data ...any) {
 	}
 }
 
-func (a *Authenticator) checkConnection(ctx context.Context) (err error) {
-	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.checkConnection",
-		trace.WithSpanKind(trace.SpanKindClient),
-	)
-	defer span.End()
-	err = a.Ping(ctx)
-	if err != nil {
-		switch {
-		case errors.Is(err, ldap.ErrNilConnection), ldap.IsErrorWithCode(err, ldap.ErrorNetwork):
-			a.LDAPConn, err = ldap.DialURL(a.Options.ConnectionString, ldap.DialWithTLSConfig(a.Options.TLS))
-			if err != nil {
-				span.SetStatus(codes.Error, err.Error())
-				return err
-			}
-			if a.Options.StartTLS {
-				err = a.LDAPConn.StartTLS(a.Options.TLS)
-				if err != nil {
-					span.SetStatus(codes.Error, err.Error())
-					return err
-				}
-			}
-			span.AddEvent("connection is restored")
-			return nil
-
-		default:
-			span.SetStatus(codes.Error, err.Error())
-			return err
-		}
-	}
-	span.AddEvent("connection is alive")
-	return nil
-}
-
-func (a *Authenticator) bindAsUser(ctx context.Context, username, password string) (user *User, err error) {
-	ctx2, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.bindAsUser",
+func (a *Authenticator) bindAsUser(initialCtx context.Context, username, password string) (user *User, err error) {
+	ctx, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(initialCtx, "ldap4gin.bindAsUser",
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 	defer span.End()
@@ -106,7 +79,7 @@ func (a *Authenticator) bindAsUser(ctx context.Context, username, password strin
 		err = ErrMalformed
 		return
 	}
-	err = a.checkConnection(ctx2)
+	err = a.Ping(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +130,7 @@ func (a *Authenticator) bindAsUser(ctx context.Context, username, password strin
 		span.SetStatus(codes.Error, err.Error())
 		return
 	}
+	a.currentBind = dn
 	a.debug(ctx, "bind succeeded as %s", dn)
 	span.AddEvent("bind succeeded")
 
@@ -200,7 +174,7 @@ func (a *Authenticator) bindAsUser(ctx context.Context, username, password strin
 	return
 }
 
-func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error) {
+func (a *Authenticator) attachGroups(initialCtx context.Context, user *User) (err error) {
 	if a.Options.GroupsOU == "" {
 		err = fmt.Errorf("groups organization unit is not configured")
 		return
@@ -213,28 +187,33 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 		err = fmt.Errorf("readonlyPassword password is not set")
 		return
 	}
-	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").
-		Start(ctx, "ldap4gin:attachGroups",
+	ctx, span := otel.Tracer("github.com/vodolaz095/ldap4gin").
+		Start(initialCtx, "ldap4gin:attachGroups",
 			trace.WithSpanKind(trace.SpanKindClient),
 		)
 	defer span.End()
 	span.AddEvent("binding as readonly")
 	span.SetAttributes(attribute.String("bind.readonly_dn", a.Options.ReadonlyDN))
 	span.SetAttributes(semconv.EnduserID(user.DN))
-	err = a.checkConnection(ctx)
+	err = a.Ping(ctx)
 	if err != nil {
-		return
-	}
-	err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
-	if err != nil {
-		if strings.Contains(err.Error(), "LDAP Result Code 49") {
-			span.AddEvent("invalid credentials for readonly user")
-			err = ErrReadonlyWrongCredentials
-			return
-		}
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return
+	}
+	if a.currentBind != a.Options.ReadonlyDN {
+		err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
+		if err != nil {
+			if strings.Contains(err.Error(), "LDAP Result Code 49") {
+				span.AddEvent("invalid credentials for readonly user")
+				err = ErrReadonlyWrongCredentials
+				return
+			}
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return
+		}
+		a.currentBind = a.Options.ReadonlyDN
 	}
 	span.AddEvent("bound properly as readonly")
 	searchGroupsRequest := ldap.NewSearchRequest(
@@ -274,7 +253,7 @@ func (a *Authenticator) attachGroups(ctx context.Context, user *User) (err error
 	return
 }
 
-func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
+func (a *Authenticator) reload(initialCtx context.Context, user *User) (err error) {
 	if a.Options.ReadonlyDN == "" {
 		err = fmt.Errorf("readonly distinguished name is not configured")
 		return
@@ -283,18 +262,25 @@ func (a *Authenticator) reload(ctx context.Context, user *User) (err error) {
 		err = fmt.Errorf("readonlyPassword password is not set")
 		return
 	}
-	_, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(ctx, "ldap4gin.reload",
+	ctx, span := otel.Tracer("github.com/vodolaz095/ldap4gin").Start(initialCtx, "ldap4gin.reload",
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 	defer span.End()
 	span.AddEvent("Binding as readonly...")
-	err = a.checkConnection(ctx)
+	err = a.Ping(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return
 	}
-	err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
-	if err != nil {
-		return
+	if a.currentBind != a.Options.ReadonlyDN {
+		err = a.LDAPConn.Bind(a.Options.ReadonlyDN, a.Options.ReadonlyPasswd)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return
+		}
+		a.currentBind = a.Options.ReadonlyDN
 	}
 	span.AddEvent("Searching user profile")
 	searchRequest := ldap.NewSearchRequest(
@@ -358,8 +344,10 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 	span.AddEvent("Binding to ldap...")
 	user, err := a.bindAsUser(c.Request.Context(), username, password)
 	if err != nil {
-		if !errors.Is(err, ErrInvalidCredentials) {
+		if errors.Is(err, ErrInvalidCredentials) {
 			span.AddEvent("wrong credentials")
+		} else {
+			span.SetStatus(codes.Error, err.Error())
 			span.RecordError(err)
 		}
 		return
@@ -371,6 +359,7 @@ func (a *Authenticator) Authorize(c *gin.Context, username, password string) (er
 		err = a.attachGroups(c.Request.Context(), user)
 		if err != nil {
 			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return
 		}
 		span.SetAttributes(semconv.EnduserRole(user.PrintGroups()))
