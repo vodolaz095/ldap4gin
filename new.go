@@ -18,7 +18,7 @@ func New(opts *Options) (a *Authenticator, err error) {
 	} else {
 		a.LogDebugFunc = DefaultLogDebugFunc
 	}
-	err = a.checkConnection(context.Background())
+	err = a.Ping(context.Background())
 	if err != nil {
 		return nil, err
 	}
