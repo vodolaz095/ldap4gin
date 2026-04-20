@@ -28,7 +28,7 @@ const SessionKeyName = "ldap4gin_user"
 func timeOut(ctx context.Context) (timeout int) {
 	deadline, ok := ctx.Deadline()
 	if ok {
-		timeout = int(math.Round(deadline.Sub(time.Now()).Seconds()))
+		timeout = int(math.Round(time.Since(deadline).Seconds()))
 	} else {
 		timeout = 0
 	}
@@ -357,13 +357,11 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 	session := sessions.Default(c)
 	ui := session.Get(SessionKeyName)
 	if ui != nil {
-		switch ui.(type) {
+		switch raw := ui.(type) {
 		case User:
-			raw := ui.(User)
 			user = &raw
-			break
 		case *User:
-			user = ui.(*User)
+			user = raw
 		default:
 			err = fmt.Errorf("unknown type")
 			return
@@ -377,7 +375,7 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 			span.AddEvent("User session expired")
 			a.debug(c.Request.Context(), "user's profile %s expired on %s %s ago, refreshing...",
 				user.UID, user.ExpiresAt.Format(time.Stamp),
-				time.Now().Sub(user.ExpiresAt).String(),
+				time.Since(user.ExpiresAt).String(),
 			)
 			err = a.reload(c.Request.Context(), user)
 			if err != nil {
@@ -389,7 +387,7 @@ func (a *Authenticator) Extract(c *gin.Context) (user *User, err error) {
 			span.AddEvent("User session is valid")
 			a.debug(c.Request.Context(), "user's profile %s is valid until %s for %s",
 				user.UID, user.ExpiresAt.Format(time.Stamp),
-				user.ExpiresAt.Sub(time.Now()).String(),
+				time.Until(user.ExpiresAt).String(),
 			)
 		}
 		span.SetAttributes(semconv.EnduserID(user.DN))
