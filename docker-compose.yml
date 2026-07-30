@@ -24,6 +24,12 @@ services:
     volumes:
       - ldap:/var/lib/ldap
       - slapdd:/etc/ldap/slapd.d
+      - type: bind
+        source: ./tests/
+        target: /container/service/slapd/assets/config/bootstrap/ldif/custom/
+        read_only: true
+        bind:
+          selinux: Z
     ports:
       - "1389:389"
       - "1636:636"
