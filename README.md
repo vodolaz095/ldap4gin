@@ -227,6 +227,17 @@ searchRequest := ldap.NewSearchRequest(
 
 ![spans.png](docs%2Fspans.png)
 
+Default OpenLDAP (from docker container) users credentials are:
+
+| Username | Password   | Emails                                       |
+|----------|------------|----------------------------------------------|
+| user1    | test321    | user1@vodolaz095.ru                          |
+| user2    | test321    | user2@vodolaz095.ru                          |
+| user3    | test321    | user3@vodolaz095.ru, user3_bis@vodolaz095.ru |
+
+
+
+
 # MIT License
 
 Copyright (c) 2021 Anatolij Ostroumov
