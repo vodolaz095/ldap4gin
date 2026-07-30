@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -15,7 +16,8 @@ import (
 	"github.com/vodolaz095/ldap4gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
@@ -29,10 +31,11 @@ func main() {
 	}
 
 	// export via compact thrift protocol over upd - important
-	exp, err := jaeger.New(jaeger.WithAgentEndpoint(
-		jaeger.WithAgentHost("127.0.0.1"),
-		jaeger.WithAgentPort("6831"),
-	))
+	client := otlptracehttp.NewClient(
+		otlptracehttp.WithEndpoint("127.0.0.1:4318"),
+		otlptracehttp.WithInsecure(),
+	)
+	exp, err := otlptrace.New(context.Background(), client)
 	if err != nil {
 		return
 	}
@@ -142,10 +145,11 @@ func main() {
 			session.AddFlash(fmt.Sprintf("Authorization error  %s", cErr))
 			c.Redirect(http.StatusFound, "/")
 			return
-		} else {
-			log.Printf("User %s authorized from %s!", username, c.ClientIP())
-			session.AddFlash(fmt.Sprintf("Welcome, %s!", username))
 		}
+
+		log.Printf("User %s authorized from %s!", username, c.ClientIP())
+		session.AddFlash(fmt.Sprintf("Welcome, %s!", username))
+
 		user, cErr := authenticator.Extract(c)
 		if cErr != nil {
 			log.Printf("%s : while extracting user", cErr)
