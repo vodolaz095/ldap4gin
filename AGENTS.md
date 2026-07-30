@@ -128,6 +128,10 @@ The module includes OpenTelemetry tracing:
   - Session management
   - Error handling for various LDAP error conditions
 - The example application serves as integration test
+- Tests require environment variables to be set:
+  - `TEST_LDAP_USERNAME`: Username for test authentication
+  - `TEST_LDAP_PASSWORD`: Password for test authentication
+  - `TEST_LDAP_URL`: LDAP server URL for testing
 
 ## Important Gotchas
 
